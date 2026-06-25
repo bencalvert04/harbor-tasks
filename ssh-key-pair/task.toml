@@ -1,0 +1,37 @@
+schema_version = "1.2"
+artifacts = []
+
+[task]
+name = "bencalvertpractice/ssh-key-pair"
+description = ""
+authors = []
+keywords = []
+
+[metadata]
+author_name = "Benjamin Calvert"
+author_email = "bencalvert04@gmail.com" 
+difficulty_explanation = "Simple SSH key generation command." 
+category = "system-administration" 
+Tags = ["ssh", "cryptography", "linux"]
+
+[verifier]
+timeout_sec = 120
+
+[verifier.env]
+
+[agent]
+timeout_sec = 120
+
+[environment]
+build_timeout_sec = 600.0
+os = "linux"
+cpus = 1
+memory_mb = 2048
+storage_mb = 10240
+gpus = 0
+allow_internet = true
+mcp_servers = []
+
+[environment.env]
+
+[solution.env]

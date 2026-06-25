@@ -1,0 +1,41 @@
+{
+    "results": {
+        "tool": {
+            "name": "pytest",
+            "version": "8.4.1"
+        },
+        "summary": {
+            "tests": 2,
+            "passed": 2,
+            "failed": 0,
+            "skipped": 0,
+            "pending": 0,
+            "other": 0,
+            "start": 1782422560.401765,
+            "stop": 1782422560.6957486
+        },
+        "tests": [
+            {
+                "name": "test_outputs.py::test_masks_present",
+                "status": "passed",
+                "duration": 0.0004292069999998205,
+                "start": 1782422560.6785753,
+                "stop": 1782422560.6791644,
+                "retries": 0,
+                "file_path": "test_outputs.py"
+            },
+            {
+                "name": "test_outputs.py::test_background_removed",
+                "status": "passed",
+                "duration": 0.011699790999998072,
+                "start": 1782422560.6792443,
+                "stop": 1782422560.6910615,
+                "retries": 4,
+                "file_path": "test_outputs.py",
+                "tags": [
+                    "parametrize::mask_path::[PosixPath('/tests/masks/beige_table.png'), PosixPath('/tests/masks/blue_backdrop.png'), PosixPath('/tests/masks/chroma_green.png'), PosixPath('/tests/masks/gray_seamless.png'), PosixPath('/tests/masks/studio_white.png')]::ids_<function <lambda> at 0xffff742f51c0>"
+                ]
+            }
+        ]
+    }
+}

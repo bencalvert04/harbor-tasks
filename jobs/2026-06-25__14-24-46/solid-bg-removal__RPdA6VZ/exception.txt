@@ -1,0 +1,140 @@
+Traceback (most recent call last):
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/trial/trial.py", line 161, in run
+    await self._run()
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/trial/single_step.py", line 33, in _run
+    await self._run_agent()
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/trial/single_step.py", line 63, in _run_agent
+    await self._run_agent_phase(
+    ...<4 lines>...
+    )
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/trial/trial.py", line 238, in _run_agent_phase
+    await asyncio.wait_for(
+    ...<6 lines>...
+    )
+  File "/Users/bencalvert04/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/asyncio/tasks.py", line 507, in wait_for
+    return await fut
+           ^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/agents/terminus_2/terminus_2.py", line 1628, in run
+    await self._run_agent_loop(
+    ...<4 lines>...
+    )
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/agents/terminus_2/terminus_2.py", line 1311, in _run_agent_loop
+    ) = await self._handle_llm_interaction(
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        chat, prompt, logging_paths, original_instruction, self._session
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/agents/terminus_2/terminus_2.py", line 1186, in _handle_llm_interaction
+    llm_response = await self._query_llm(
+                   ^^^^^^^^^^^^^^^^^^^^^^
+        chat, prompt, logging_paths, original_instruction, session
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/asyncio/__init__.py", line 193, in async_wrapped
+    return await copy(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/asyncio/__init__.py", line 112, in __call__
+    do = await self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/asyncio/__init__.py", line 157, in iter
+    result = await action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/_utils.py", line 111, in inner
+    return call(*args, **kwargs)
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/__init__.py", line 413, in exc_check
+    raise retry_exc.reraise()
+          ~~~~~~~~~~~~~~~~~^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/__init__.py", line 184, in reraise
+    raise self.last_attempt.result()
+          ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/bencalvert04/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "/Users/bencalvert04/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/asyncio/__init__.py", line 116, in __call__
+    result = await fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/agents/terminus_2/terminus_2.py", line 1176, in _query_llm
+    raise e
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/agents/terminus_2/terminus_2.py", line 1009, in _query_llm
+    llm_response = await chat.chat(
+                   ^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+    )
+    ^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/llms/chat.py", line 89, in chat
+    llm_response: LLMResponse = await self._model.call(
+                                ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+    )
+    ^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/asyncio/__init__.py", line 193, in async_wrapped
+    return await copy(fn, *args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/asyncio/__init__.py", line 112, in __call__
+    do = await self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/asyncio/__init__.py", line 157, in iter
+    result = await action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/_utils.py", line 111, in inner
+    return call(*args, **kwargs)
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/__init__.py", line 393, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ~~~~~~~~~~~~~~~~~^^
+  File "/Users/bencalvert04/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ~~~~~~~~~~~~~~~~~^^
+  File "/Users/bencalvert04/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/tenacity/asyncio/__init__.py", line 116, in __call__
+    result = await fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/llms/lite_llm.py", line 395, in call
+    self._handle_litellm_error(e)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/llms/lite_llm.py", line 626, in _handle_litellm_error
+    raise e
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/harbor/llms/lite_llm.py", line 359, in call
+    response = await litellm.acompletion(**completion_kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/litellm/utils.py", line 2099, in wrapper_async
+    raise e
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/litellm/utils.py", line 1898, in wrapper_async
+    result = await original_function(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/litellm/main.py", line 656, in acompletion
+    raise exception_type(
+    ...<5 lines>...
+    )
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/litellm/main.py", line 629, in acompletion
+    init_response = await loop.run_in_executor(None, func_with_context)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/bencalvert04/.local/share/uv/python/cpython-3.13.5-macos-aarch64-none/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/litellm/utils.py", line 1445, in wrapper
+    result = original_function(*args, **kwargs)
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/litellm/main.py", line 4502, in completion
+    raise exception_type(
+    ...<5 lines>...
+    )
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/litellm/main.py", line 2934, in completion
+    response = anthropic_chat_completions.completion(
+        model=model,
+    ...<15 lines>...
+        custom_llm_provider=custom_llm_provider,
+    )
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/litellm/llms/anthropic/chat/handler.py", line 360, in completion
+    headers = AnthropicConfig().validate_environment(
+        api_key=api_key,
+    ...<4 lines>...
+        litellm_params=litellm_params,
+    )
+  File "/Users/bencalvert04/.local/share/uv/tools/harbor/lib/python3.13/site-packages/litellm/llms/anthropic/common_utils.py", line 528, in validate_environment
+    raise litellm.AuthenticationError(
+    ...<3 lines>...
+    )
+litellm.exceptions.AuthenticationError: litellm.AuthenticationError: Missing Anthropic API Key - A call is being made to anthropic but no key is set either in the environment variables or via params. Please set `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in your environment vars

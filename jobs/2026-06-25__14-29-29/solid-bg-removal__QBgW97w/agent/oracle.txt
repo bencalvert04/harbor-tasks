@@ -1,0 +1,5 @@
+wrote /app/output/beige_table.png
+wrote /app/output/blue_backdrop.png
+wrote /app/output/chroma_green.png
+wrote /app/output/gray_seamless.png
+wrote /app/output/studio_white.png

@@ -1,0 +1,37 @@
+schema_version = "1.2"
+artifacts = []
+
+[task]
+name = "bencalvert/solid-bg-removal"
+description = "Write a program that removes a solid-color background from photos, outputting transparent PNGs"
+keywords = ["python", "pillow", "image-processing", "computer-vision", "background-removal", "pytest"]
+[[task.authors]]
+name = "Ben Calvert"
+email = "bencalvert04@gmail.com"
+
+[metadata]
+difficulty = "easy"
+category = "programming"
+tags = ["image-processing", "computer-vision"]
+
+[verifier]
+timeout_sec = 600.0
+
+[verifier.env]
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+build_timeout_sec = 600.0
+os = "linux"
+cpus = 1
+memory_mb = 2048
+storage_mb = 10240
+gpus = 0
+allow_internet = true
+mcp_servers = []
+
+[environment.env]
+
+[solution.env]

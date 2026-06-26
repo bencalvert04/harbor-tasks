@@ -1,0 +1,40 @@
+schema_version = "1.2"
+artifacts = ["/srv/tool-log/requests.ndjson"]
+
+[task]
+name = "bencalvert/scheduler"
+description = "Agent creates a Google Calendar event and sends a Gmail notification via a Google API-compatible tool service; graded against the tool service's tamper-resistant request log."
+authors = []
+keywords = ["google-calendar", "gmail", "tool-use", "multicontainer", "sidecar", "pytest"]
+
+[metadata]
+
+[verifier]
+timeout_sec = 600.0
+
+[verifier.env]
+GMAIL_USER = "user@example.com"
+
+[agent]
+timeout_sec = 600.0
+
+[environment]
+build_timeout_sec = 600.0
+os = "linux"
+cpus = 1
+memory_mb = 2048
+storage_mb = 10240
+gpus = 0
+allow_internet = true
+mcp_servers = []
+
+[environment.env]
+GMAIL_USER = "user@example.com"
+
+[environment.healthcheck]
+command = "python3 -c \"import urllib.request; urllib.request.urlopen('http://tool:8080/health')\""
+interval_sec = 3.0
+timeout_sec = 10.0
+retries = 10
+
+[solution.env]

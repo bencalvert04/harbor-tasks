@@ -1,0 +1,36 @@
+# Merged on top of Harbor's base compose, which already defines the `main`
+# service (built from ./Dockerfile, running `sleep infinity`). Here we only add
+# the `tool` sidecar, a shared log volume, and the wiring `main` needs to reach
+# it.
+#
+# Anti-cheat: `tool` mounts the log volume read-write; `main` mounts the SAME
+# volume read-only. A read-only mount is kernel-enforced even for root, so the
+# agent in `main` cannot forge entries in requests.ndjson. The only way to add a
+# log entry is to call the tool service's HTTP API -- which is the task itself.
+
+services:
+  tool:
+    build:
+      context: ./tool_service
+    environment:
+      GMAIL_USER: ${GMAIL_USER:-user@example.com}
+    volumes:
+      - tool_log:/var/log/api
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 3s
+      timeout: 10s
+      retries: 10
+
+  main:
+    environment:
+      TOOL_SERVICE_URL: http://tool:8080
+      GMAIL_USER: ${GMAIL_USER:-user@example.com}
+    volumes:
+      - tool_log:/srv/tool-log:ro
+    depends_on:
+      tool:
+        condition: service_healthy
+
+volumes:
+  tool_log:

@@ -14,6 +14,9 @@ services:
       context: ./tool_service
     environment:
       GMAIL_USER: ${GMAIL_USER:-user@example.com}
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-scheduler-agent}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-scheduler-secret-9f3a}
+      OAUTH_REFRESH_TOKEN: ${OAUTH_REFRESH_TOKEN:-seed-refresh-token-7c21}
     volumes:
       - tool_log:/var/log/api
     healthcheck:
@@ -26,6 +29,9 @@ services:
     environment:
       TOOL_SERVICE_URL: http://tool:8080
       GMAIL_USER: ${GMAIL_USER:-user@example.com}
+      OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-scheduler-agent}
+      OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-scheduler-secret-9f3a}
+      OAUTH_REFRESH_TOKEN: ${OAUTH_REFRESH_TOKEN:-seed-refresh-token-7c21}
     volumes:
       - tool_log:/srv/tool-log:ro
     depends_on:

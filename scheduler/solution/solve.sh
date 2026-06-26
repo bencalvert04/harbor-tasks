@@ -19,7 +19,24 @@ TITLE = "Deep Work Block"
 TZ = ZoneInfo("America/Los_Angeles")
 
 
+def get_access_token() -> str:
+    r = requests.post(
+        f"{BASE_URL}/oauth2/token",
+        data={
+            "grant_type": "refresh_token",
+            "client_id": os.environ["OAUTH_CLIENT_ID"],
+            "client_secret": os.environ["OAUTH_CLIENT_SECRET"],
+            "refresh_token": os.environ["OAUTH_REFRESH_TOKEN"],
+        },
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json()["access_token"]
+
+
 def main() -> int:
+    headers = {"Authorization": f"Bearer {get_access_token()}"}
+
     # Tomorrow at 09:00 America/Los_Angeles, 90 minutes long.
     now = datetime.now(TZ)
     start = (now + timedelta(days=1)).replace(
@@ -37,6 +54,7 @@ def main() -> int:
     r = requests.post(
         f"{BASE_URL}/calendar/v3/calendars/primary/events",
         json=event,
+        headers=headers,
         timeout=30,
     )
     r.raise_for_status()
@@ -56,6 +74,7 @@ def main() -> int:
     r = requests.post(
         f"{BASE_URL}/gmail/v1/users/me/messages/send",
         json={"raw": raw},
+        headers=headers,
         timeout=30,
     )
     r.raise_for_status()

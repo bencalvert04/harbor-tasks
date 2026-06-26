@@ -11,10 +11,35 @@ Google APIs. The base URL is provided in the `TOOL_SERVICE_URL` environment
 variable. The service exposes the same endpoint paths and request/response
 shapes as the real Google Calendar and Gmail REST APIs, so you can write your
 requests exactly as you would against Google — just point them at
-`TOOL_SERVICE_URL`. No authentication is required.
+`TOOL_SERVICE_URL`.
 
 The recipient's email address is provided in the `GMAIL_USER` environment
 variable.
+
+## Authentication
+
+All Calendar and Gmail endpoints require a valid OAuth2 bearer token; requests
+without one are rejected with `401`. You are provisioned with long-lived
+credentials in the environment:
+
+- `OAUTH_CLIENT_ID`
+- `OAUTH_CLIENT_SECRET`
+- `OAUTH_REFRESH_TOKEN`
+
+Exchange them for a short-lived access token exactly as you would with Google's
+token endpoint — send a `POST` to `{TOOL_SERVICE_URL}/oauth2/token` with a
+form-encoded body:
+
+```
+grant_type=refresh_token
+client_id=$OAUTH_CLIENT_ID
+client_secret=$OAUTH_CLIENT_SECRET
+refresh_token=$OAUTH_REFRESH_TOKEN
+```
+
+The JSON response contains an `access_token` (valid for `expires_in` seconds).
+Send it as an `Authorization: Bearer <access_token>` header on every Calendar
+and Gmail request.
 
 ## 1. Calendar event
 

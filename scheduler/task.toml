@@ -30,6 +30,9 @@ mcp_servers = []
 
 [environment.env]
 GMAIL_USER = "user@example.com"
+OAUTH_CLIENT_ID = "scheduler-agent"
+OAUTH_CLIENT_SECRET = "scheduler-secret-9f3a"
+OAUTH_REFRESH_TOKEN = "seed-refresh-token-7c21"
 
 [environment.healthcheck]
 command = "python3 -c \"import urllib.request; urllib.request.urlopen('http://tool:8080/health')\""

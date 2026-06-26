@@ -9,6 +9,8 @@ tamper-resistant grading.
 
 import json
 import os
+import secrets
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -19,6 +21,46 @@ app = Flask(__name__)
 REQUEST_LOG = "/var/log/api/requests.ndjson"
 
 os.makedirs(os.path.dirname(REQUEST_LOG), exist_ok=True)
+
+
+# ---------------------------------------------------------------------------
+# OAuth2 (mirrors Google's refresh-token flow)
+#
+# A real headless integration is provisioned with a long-lived refresh token
+# plus client credentials; it exchanges them for short-lived access tokens and
+# attaches them as `Authorization: Bearer` on every API call. We model exactly
+# that. Interactive consent is intentionally NOT modelled -- an agent cannot
+# click a browser consent screen. Secrets are never written to REQUEST_LOG.
+# ---------------------------------------------------------------------------
+
+CLIENT_ID = os.environ.get("OAUTH_CLIENT_ID", "scheduler-agent")
+CLIENT_SECRET = os.environ.get("OAUTH_CLIENT_SECRET", "scheduler-secret")
+REFRESH_TOKEN = os.environ.get("OAUTH_REFRESH_TOKEN", "seed-refresh-token")
+ACCESS_TOKEN_TTL = int(os.environ.get("OAUTH_ACCESS_TOKEN_TTL", "60"))
+
+# In-memory store of issued access tokens -> expiry (epoch seconds).
+_access_tokens: dict[str, float] = {}
+
+
+def _issue_token() -> str:
+    token = secrets.token_urlsafe(32)
+    _access_tokens[token] = time.time() + ACCESS_TOKEN_TTL
+    return token
+
+
+def _auth_error():
+    """Return a (response, status) tuple if unauthenticated, else None."""
+    header = request.headers.get("Authorization", "")
+    if not header.startswith("Bearer "):
+        return jsonify({"error": {"code": 401, "message": "Missing bearer token"}}), 401
+    token = header[len("Bearer "):].strip()
+    expiry = _access_tokens.get(token)
+    if expiry is None:
+        return jsonify({"error": {"code": 401, "message": "Invalid credentials"}}), 401
+    if time.time() > expiry:
+        _access_tokens.pop(token, None)
+        return jsonify({"error": {"code": 401, "message": "Access token expired"}}), 401
+    return None
 
 
 def _log(endpoint: str, body: dict) -> None:
@@ -41,12 +83,43 @@ def health():
 
 
 # ---------------------------------------------------------------------------
+# OAuth2 token endpoint
+# https://developers.google.com/identity/protocols/oauth2/web-server#offline
+# ---------------------------------------------------------------------------
+
+@app.post("/oauth2/token")
+def oauth_token():
+    # Google accepts form-encoded bodies; tolerate JSON too.
+    data = request.form.to_dict() or (request.get_json(force=True, silent=True) or {})
+    if data.get("grant_type") != "refresh_token":
+        return jsonify({"error": "unsupported_grant_type"}), 400
+    if (
+        data.get("client_id") != CLIENT_ID
+        or data.get("client_secret") != CLIENT_SECRET
+        or data.get("refresh_token") != REFRESH_TOKEN
+    ):
+        return jsonify({"error": "invalid_grant"}), 401
+    return jsonify(
+        {
+            "access_token": _issue_token(),
+            "expires_in": ACCESS_TOKEN_TTL,
+            "token_type": "Bearer",
+            "scope": "https://www.googleapis.com/auth/calendar "
+            "https://www.googleapis.com/auth/gmail.send",
+        }
+    ), 200
+
+
+# ---------------------------------------------------------------------------
 # Google Calendar Events: insert
 # https://developers.google.com/calendar/api/v3/reference/events/insert
 # ---------------------------------------------------------------------------
 
 @app.post("/calendar/v3/calendars/<calendar_id>/events")
 def calendar_events_insert(calendar_id: str):
+    err = _auth_error()
+    if err:
+        return err
     body = request.get_json(force=True, silent=True) or {}
     _log("calendar.events.insert", body)
 
@@ -83,6 +156,9 @@ def calendar_events_insert(calendar_id: str):
 
 @app.post("/gmail/v1/users/<user_id>/messages/send")
 def gmail_messages_send(user_id: str):
+    err = _auth_error()
+    if err:
+        return err
     body = request.get_json(force=True, silent=True) or {}
     _log("gmail.messages.send", body)
 

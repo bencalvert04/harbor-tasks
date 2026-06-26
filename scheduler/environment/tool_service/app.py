@@ -5,14 +5,28 @@ Mirrors real Google API endpoint paths and response shapes so the agent
 can write code identical to what it would use against the real APIs.
 Every incoming request is appended as an NDJSON line to REQUEST_LOG for
 tamper-resistant grading.
+
+At startup the service seeds:
+  * an inbox message from a requester asking for a "Deep Work Block"
+    tomorrow 09:00-10:30 America/Los_Angeles, and
+  * RANDOMLY, one existing calendar event tomorrow morning that either
+    OVERLAPS that window or does not.
+
+The overlap branch is never written anywhere the agent can read -- it lives
+only in the authenticated API responses. The agent must list the calendar to
+discover it; the verifier independently lists the calendar to know which
+branch to grade.
 """
 
+import base64
 import json
 import os
+import random
 import secrets
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from flask import Flask, request, jsonify
 
@@ -21,6 +35,10 @@ app = Flask(__name__)
 REQUEST_LOG = "/var/log/api/requests.ndjson"
 
 os.makedirs(os.path.dirname(REQUEST_LOG), exist_ok=True)
+
+TZ = ZoneInfo("America/Los_Angeles")
+REQUESTER = "requester@example.com"
+GMAIL_USER = os.environ.get("GMAIL_USER", "user@example.com")
 
 
 # ---------------------------------------------------------------------------
@@ -74,6 +92,62 @@ def _log(endpoint: str, body: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Startup seeding: one inbox request + one (randomly overlapping) calendar event
+# ---------------------------------------------------------------------------
+
+def _seed():
+    tomorrow = (datetime.now(TZ) + timedelta(days=1)).date()
+
+    # Coin flip: does an existing event collide with the 09:00-10:30 window?
+    # SCHEDULER_FORCE_OVERLAP ("1"/"0") pins the branch for deterministic tests.
+    forced = os.environ.get("SCHEDULER_FORCE_OVERLAP")
+    if forced in ("0", "1"):
+        overlaps = forced == "1"
+    else:
+        overlaps = random.random() < 0.5
+    if overlaps:
+        (sh, sm), (eh, em), summary = (9, 30), (10, 0), "Team standup"
+    else:
+        (sh, sm), (eh, em), summary = (14, 0), (15, 0), "Budget review"
+
+    start_dt = datetime(tomorrow.year, tomorrow.month, tomorrow.day, sh, sm, tzinfo=TZ)
+    end_dt = datetime(tomorrow.year, tomorrow.month, tomorrow.day, eh, em, tzinfo=TZ)
+    conflict_event = {
+        "kind": "calendar#event",
+        "id": uuid.uuid4().hex,
+        "status": "confirmed",
+        "summary": summary,
+        "start": {"dateTime": start_dt.isoformat(), "timeZone": "America/Los_Angeles"},
+        "end": {"dateTime": end_dt.isoformat(), "timeZone": "America/Los_Angeles"},
+    }
+
+    body_text = (
+        "Hi,\n\n"
+        "Could you set up a Deep Work Block on my calendar for tomorrow from "
+        "09:00 to 10:30 (America/Los_Angeles)? Reply to let me know whether it "
+        "is booked.\n\nThanks!"
+    )
+    inbox_message = {
+        "id": uuid.uuid4().hex,
+        "threadId": uuid.uuid4().hex,
+        "labelIds": ["INBOX", "UNREAD"],
+        "snippet": body_text[:90],
+        "payload": {
+            "headers": [
+                {"name": "From", "value": REQUESTER},
+                {"name": "To", "value": GMAIL_USER},
+                {"name": "Subject", "value": "Deep work block for tomorrow?"},
+            ],
+            "body": {"data": base64.urlsafe_b64encode(body_text.encode()).decode("ascii")},
+        },
+    }
+    return [conflict_event], [inbox_message]
+
+
+_seeded_events, _inbox = _seed()
+
+
+# ---------------------------------------------------------------------------
 # Health
 # ---------------------------------------------------------------------------
 
@@ -105,9 +179,54 @@ def oauth_token():
             "expires_in": ACCESS_TOKEN_TTL,
             "token_type": "Bearer",
             "scope": "https://www.googleapis.com/auth/calendar "
-            "https://www.googleapis.com/auth/gmail.send",
+            "https://www.googleapis.com/auth/gmail.modify",
         }
     ), 200
+
+
+# ---------------------------------------------------------------------------
+# Gmail Messages: list / get (read the incoming request)
+# https://developers.google.com/gmail/api/reference/rest/v1/users.messages
+# ---------------------------------------------------------------------------
+
+@app.get("/gmail/v1/users/<user_id>/messages")
+def gmail_messages_list(user_id: str):
+    err = _auth_error()
+    if err:
+        return err
+    _log("gmail.messages.list", {})
+    return jsonify(
+        {
+            "messages": [{"id": m["id"], "threadId": m["threadId"]} for m in _inbox],
+            "resultSizeEstimate": len(_inbox),
+        }
+    ), 200
+
+
+@app.get("/gmail/v1/users/<user_id>/messages/<message_id>")
+def gmail_messages_get(user_id: str, message_id: str):
+    err = _auth_error()
+    if err:
+        return err
+    _log("gmail.messages.get", {"id": message_id})
+    for m in _inbox:
+        if m["id"] == message_id:
+            return jsonify(m), 200
+    return jsonify({"error": {"code": 404, "message": "Message not found"}}), 404
+
+
+# ---------------------------------------------------------------------------
+# Google Calendar Events: list (check for conflicts)
+# https://developers.google.com/calendar/api/v3/reference/events/list
+# ---------------------------------------------------------------------------
+
+@app.get("/calendar/v3/calendars/<calendar_id>/events")
+def calendar_events_list(calendar_id: str):
+    err = _auth_error()
+    if err:
+        return err
+    _log("calendar.events.list", {})
+    return jsonify({"kind": "calendar#events", "items": _seeded_events}), 200
 
 
 # ---------------------------------------------------------------------------
@@ -138,8 +257,8 @@ def calendar_events_insert(calendar_id: str):
         "updated": datetime.now(timezone.utc).isoformat(),
         "summary": summary,
         "description": body.get("description", ""),
-        "creator": {"email": os.environ.get("GMAIL_USER", "user@example.com"), "self": True},
-        "organizer": {"email": os.environ.get("GMAIL_USER", "user@example.com"), "self": True},
+        "creator": {"email": GMAIL_USER, "self": True},
+        "organizer": {"email": GMAIL_USER, "self": True},
         "start": start,
         "end": end,
         "iCalUID": f"{event_id}@google.com",
@@ -150,7 +269,7 @@ def calendar_events_insert(calendar_id: str):
 
 
 # ---------------------------------------------------------------------------
-# Gmail Messages: send
+# Gmail Messages: send (the reply)
 # https://developers.google.com/gmail/api/reference/rest/v1/users.messages/send
 # ---------------------------------------------------------------------------
 

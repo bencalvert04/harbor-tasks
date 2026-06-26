@@ -17,6 +17,8 @@ services:
       OAUTH_CLIENT_ID: ${OAUTH_CLIENT_ID:-scheduler-agent}
       OAUTH_CLIENT_SECRET: ${OAUTH_CLIENT_SECRET:-scheduler-secret-9f3a}
       OAUTH_REFRESH_TOKEN: ${OAUTH_REFRESH_TOKEN:-seed-refresh-token-7c21}
+      # Test-only: pin the conflict branch ("1"/"0"); unset = random.
+      SCHEDULER_FORCE_OVERLAP: ${SCHEDULER_FORCE_OVERLAP:-}
     volumes:
       - tool_log:/var/log/api
     healthcheck:

@@ -1,18 +1,29 @@
 """
 Verifier for the scheduler task.
 
-Runs in the agent's container (shared verifier mode) and grades against the
-tool service's request log, which is mounted read-only at
-/srv/tool-log/requests.ndjson. The agent cannot write to that mount, so the
-only way an entry appears is by calling the tool service's HTTP API.
+Runs in the agent's container (shared verifier mode). It grades against two
+sources:
 
-Checks:
-  * a Google Calendar events.insert request creating "Deep Work Block"
-    tomorrow at 09:00 America/Los_Angeles, lasting 90 minutes, with a
-    non-empty description.
-  * a Gmail messages.send request whose decoded MIME message is addressed to
-    GMAIL_USER, has a subject containing the event title, and a body that
-    mentions the event date and start time.
+  * the tool service's request log, mounted read-only at
+    /srv/tool-log/requests.ndjson -- the agent cannot write to that mount, so
+    the only way an entry appears is by calling the tool's HTTP API; and
+
+  * the tool service's *live* calendar, which the verifier lists itself to
+    learn whether the seeded scenario has a conflict. The overlap branch is
+    never exposed in a file the agent could read, so the agent must genuinely
+    list the calendar and reason about it.
+
+The log is snapshotted at import time -- BEFORE the verifier makes its own API
+calls -- so the verifier's calls never masquerade as the agent's.
+
+Expected agent behaviour:
+  * authenticate, then list the inbox and read the request message;
+  * list the calendar to check the 09:00-10:30 window tomorrow;
+  * if an existing event overlaps -> do NOT create the block, and reply to the
+    requester with the phrase "I cannot." plus the date and 09:00;
+  * if the window is free -> create the "Deep Work Block" (tomorrow 09:00, 90
+    min, non-empty description) and reply with a confirmation that mentions the
+    date and 09:00.
 """
 
 import base64
@@ -23,39 +34,100 @@ from email import message_from_bytes
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-import pytest
+import requests
 
 LOG_PATH = Path("/srv/tool-log/requests.ndjson")
+BASE_URL = os.environ["TOOL_SERVICE_URL"].rstrip("/")
 TITLE = "Deep Work Block"
 TZ = ZoneInfo("America/Los_Angeles")
-RECIPIENT = os.environ.get("GMAIL_USER", "user@example.com")
+REQUESTER = "requester@example.com"
 
 
-def _load_entries():
-    assert LOG_PATH.exists(), f"tool service log not found at {LOG_PATH}"
-    entries = []
-    for line in LOG_PATH.read_text().splitlines():
-        line = line.strip()
-        if line:
-            entries.append(json.loads(line))
-    return entries
-
-
-def _entries_for(endpoint):
-    return [e for e in _load_entries() if e.get("endpoint") == endpoint]
-
-
-def _expected_dates():
-    """Tomorrow (relative to now in LA) as a date object."""
+def _tomorrow():
     return (datetime.now(TZ) + timedelta(days=1)).date()
 
 
+def _req_window():
+    t = _tomorrow()
+    start = datetime(t.year, t.month, t.day, 9, 0, tzinfo=TZ)
+    return start, start + timedelta(minutes=90)
+
+
+REQ_START, REQ_END = _req_window()
+
+
 # ---------------------------------------------------------------------------
-# Calendar
+# Snapshot the agent's log BEFORE we make any API calls of our own.
+# ---------------------------------------------------------------------------
+
+def _read_log():
+    if not LOG_PATH.exists():
+        return []
+    out = []
+    for line in LOG_PATH.read_text().splitlines():
+        line = line.strip()
+        if line:
+            out.append(json.loads(line))
+    return out
+
+
+ENTRIES = _read_log()
+
+
+def _entries_for(endpoint):
+    return [e for e in ENTRIES if e.get("endpoint") == endpoint]
+
+
+# ---------------------------------------------------------------------------
+# Independently determine the seeded branch by listing the calendar ourselves.
+# (Happens after the snapshot above.)
+# ---------------------------------------------------------------------------
+
+def _access_token():
+    r = requests.post(
+        f"{BASE_URL}/oauth2/token",
+        data={
+            "grant_type": "refresh_token",
+            "client_id": os.environ["OAUTH_CLIENT_ID"],
+            "client_secret": os.environ["OAUTH_CLIENT_SECRET"],
+            "refresh_token": os.environ["OAUTH_REFRESH_TOKEN"],
+        },
+        timeout=30,
+    )
+    r.raise_for_status()
+    return r.json()["access_token"]
+
+
+def _overlaps(ev):
+    start = ev.get("start", {}).get("dateTime")
+    end = ev.get("end", {}).get("dateTime")
+    if not start or not end:
+        return False
+    s = datetime.fromisoformat(start).astimezone(TZ)
+    e = datetime.fromisoformat(end).astimezone(TZ)
+    return s < REQ_END and REQ_START < e
+
+
+def _seeded_conflict():
+    headers = {"Authorization": f"Bearer {_access_token()}"}
+    r = requests.get(
+        f"{BASE_URL}/calendar/v3/calendars/primary/events",
+        headers=headers,
+        timeout=30,
+    )
+    r.raise_for_status()
+    return any(_overlaps(ev) for ev in r.json().get("items", []))
+
+
+CONFLICT = _seeded_conflict()
+
+
+# ---------------------------------------------------------------------------
+# Helpers over the agent's logged actions
 # ---------------------------------------------------------------------------
 
 def _matching_calendar_event():
-    tomorrow = _expected_dates()
+    tomorrow = _tomorrow()
     for entry in _entries_for("calendar.events.insert"):
         body = entry.get("body", {})
         if body.get("summary") != TITLE:
@@ -84,25 +156,7 @@ def _matching_calendar_event():
     return None
 
 
-def test_calendar_event_created():
-    events = _entries_for("calendar.events.insert")
-    assert events, "no calendar events.insert request was logged"
-
-
-def test_calendar_event_correct():
-    assert _matching_calendar_event() is not None, (
-        "no calendar event matched: expected summary 'Deep Work Block', start "
-        f"{_expected_dates()} 09:00 America/Los_Angeles, 90 min duration, and a "
-        "non-empty description"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Gmail
-# ---------------------------------------------------------------------------
-
 def _decode_raw(raw):
-    # Gmail uses base64url; tolerate missing padding.
     padded = raw + "=" * (-len(raw) % 4)
     return base64.urlsafe_b64decode(padded.encode("ascii"))
 
@@ -122,40 +176,82 @@ def _email_body_text(msg):
     return payload.decode("utf-8", errors="replace")
 
 
-def _matching_email():
-    tomorrow = _expected_dates()
-    date_iso = tomorrow.isoformat()
+def _replies():
+    msgs = []
     for entry in _entries_for("gmail.messages.send"):
         raw = entry.get("body", {}).get("raw")
         if not raw:
             continue
         try:
-            msg = message_from_bytes(_decode_raw(raw))
+            msgs.append(message_from_bytes(_decode_raw(raw)))
         except Exception:
             continue
+    return msgs
+
+
+def _matching_reply(predicate):
+    date_iso = _tomorrow().isoformat()
+    for msg in _replies():
         to = (msg.get("To") or "").strip()
-        subject = msg.get("Subject") or ""
         body = _email_body_text(msg)
-        if RECIPIENT not in to:
-            continue
-        if TITLE not in subject:
+        if REQUESTER not in to:
             continue
         if date_iso not in body:
             continue
         if "09:00" not in body:
             continue
-        return entry
+        if not predicate(body):
+            continue
+        return msg
     return None
 
 
-def test_email_sent():
-    sends = _entries_for("gmail.messages.send")
-    assert sends, "no gmail messages.send request was logged"
+# ---------------------------------------------------------------------------
+# Process checks: the agent must actually look before it acts.
+# ---------------------------------------------------------------------------
 
-
-def test_email_correct():
-    assert _matching_email() is not None, (
-        f"no email matched: expected recipient '{RECIPIENT}', subject containing "
-        f"'{TITLE}', and a body mentioning the date {_expected_dates().isoformat()} "
-        "and start time 09:00"
+def test_agent_read_inbox():
+    assert _entries_for("gmail.messages.list"), (
+        "agent never listed the inbox to read the incoming request"
     )
+
+
+def test_agent_checked_calendar():
+    assert _entries_for("calendar.events.list"), (
+        "agent never listed the calendar to check for a conflict"
+    )
+
+
+def test_reply_sent():
+    assert _entries_for("gmail.messages.send"), "no reply email was sent"
+
+
+# ---------------------------------------------------------------------------
+# Outcome checks: branch on the seeded calendar state.
+# ---------------------------------------------------------------------------
+
+def test_outcome_matches_calendar_state():
+    if CONFLICT:
+        assert _matching_calendar_event() is None, (
+            "an existing event overlapped the window, but the agent still "
+            "created the Deep Work Block"
+        )
+        assert _matching_reply(lambda b: "i cannot" in b.lower()) is not None, (
+            "expected a reply to "
+            f"{REQUESTER} containing 'I cannot.' (with the date "
+            f"{_tomorrow().isoformat()} and start time 09:00) because the "
+            "window was already booked"
+        )
+    else:
+        assert _matching_calendar_event() is not None, (
+            "the window was free, but the agent did not create a valid Deep "
+            "Work Block (summary 'Deep Work Block', tomorrow 09:00, 90 min, "
+            "non-empty description)"
+        )
+        assert _matching_reply(
+            lambda b: "confirm" in b.lower() or "scheduled" in b.lower()
+        ) is not None, (
+            "expected a confirmation reply to "
+            f"{REQUESTER} (mentioning the date {_tomorrow().isoformat()} and "
+            "start time 09:00) because the window was free"
+        )

@@ -2,23 +2,28 @@ schema_version = "1.2"
 artifacts = []
 
 [task]
+
 name = "Harbor/skill-builder"
-description = ""
+description = "Write a Claude skill that interactively tutors a beginner through building their first Harbor task."
 authors = []
-keywords = []
+keywords = ["harbor", "skill", "claude-skill", "prompt-writing", "rewardkit", "judge-grading", "documentation"]
 
 [metadata]
 
 [verifier]
-timeout_sec = 600.0
+timeout_sec = 300.0
 
 [verifier.env]
+# The Reward Kit LLM judge (tests/judge.toml) calls an Anthropic model via
+# litellm. Pull the key from the host env at run time. Alternatively set
+# CLAUDE_CODE_OAUTH_TOKEN instead.
+ANTHROPIC_API_KEY = "${ANTHROPIC_API_KEY}"
 
 [agent]
-timeout_sec = 600.0
+timeout_sec = 300.0
 
 [environment]
-build_timeout_sec = 600.0
+build_timeout_sec = 300.0
 os = "linux"
 cpus = 1
 memory_mb = 2048

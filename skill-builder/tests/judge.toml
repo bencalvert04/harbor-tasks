@@ -1,0 +1,58 @@
+# LLM-judge rubric for the Harbor-task tutor skill.
+#
+# The judge reads /app/skill.md and scores it on the quality dimensions that
+# keyword matching can't capture. Scores are normalized to 0..1 and combined by
+# weight, then blended (50/50 by default) with the programmatic reward from
+# checks.py into the task's final reward.
+#
+# Requires ANTHROPIC_API_KEY (or CLAUDE_CODE_OAUTH_TOKEN) in the verifier env.
+
+[judge]
+judge = "anthropic/claude-sonnet-4-6"
+reasoning_effort = "medium"
+files = ["/app/skill.md"]   # absolute: judge file paths are resolved as-is
+weight = 1.0                # weight of the whole judge vs. the programmatic checks
+
+# To grade against the canonical skill instead of from scratch, point the judge
+# at a reference and lean on the accuracy criterion:
+#   reference = "/tests/reference_skill.md"
+
+[[criterion]]
+name = "interactive_tutoring"
+type = "likert"
+points = 5
+weight = 2.0
+description = """Does the skill act as an INTERACTIVE, step-by-step tutor that walks the user \
+through ONE file at a time (task.toml, the Dockerfile, the test/verifier scripts, the solution, \
+then running the local verifier) — guiding and checking in rather than dumping all files at once? \
+Score 5 = clearly incremental and interactive; 1 = a flat wall of text or a single code dump."""
+
+[[criterion]]
+name = "harbor_accuracy"
+type = "likert"
+points = 5
+weight = 2.0
+description = """Are the Harbor specifics correct? Check the commands (e.g. `harbor task init`, \
+`harbor run`), the task folder layout (instruction.md, task.toml, environment/Dockerfile, \
+solution/solve.sh, tests/test.sh), the task.toml schema/fields, and the reward mechanism \
+(writing /logs/verifier/reward.txt or reward.json). Score 5 = accurate with no fabricated \
+commands or fields; 1 = substantially wrong or invented."""
+
+[[criterion]]
+name = "completeness"
+type = "likert"
+points = 5
+weight = 1.0
+description = """Does it cover the full workflow end to end: scaffolding the task, writing the \
+instruction, building the environment, designing the verifier, writing the solution, configuring \
+task.toml, and running the verifier/oracle to confirm it passes? Score 5 = all stages present; \
+1 = major stages missing."""
+
+[[criterion]]
+name = "beginner_friendly"
+type = "likert"
+points = 5
+weight = 1.0
+description = """Is it appropriate for someone building their FIRST Harbor task: clear language, \
+explains WHY each step matters (not just what to type), and avoids unexplained jargon? \
+Score 5 = a beginner could follow it unaided; 1 = assumes deep prior knowledge."""

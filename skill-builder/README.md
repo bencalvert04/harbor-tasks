@@ -1,3 +1,5 @@
+Note from Ben: this is the simplest task but uses reward kit to offer partial rewards and LLMaaJ to decide the effectiveness of the skill
+
 # Harbor/skill-builder
 
 The agent is asked to **write a Claude skill** — a system-prompt markdown file with

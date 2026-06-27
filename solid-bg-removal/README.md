@@ -1,3 +1,5 @@
+Note from Ben: Claude did this entire thing. More of a proof of concept and walkthrough than anything.
+
 # bencalvert/solid-bg-removal
 
 ## What the agent does
